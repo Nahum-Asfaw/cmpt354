@@ -1,0 +1,1 @@
+-- Write an INSERT statement on Trade that fails for violating (e).

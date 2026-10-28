@@ -1,0 +1,1 @@
+-- Write an INSERT statement that fails for violating (b).

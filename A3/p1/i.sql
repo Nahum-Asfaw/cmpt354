@@ -1,0 +1,1 @@
+-- Write a DELETE statement that fails for violating (c).
