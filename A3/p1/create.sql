@@ -30,7 +30,7 @@ CREATE TABLE Stock
 CREATE TABLE Trade
 (aid INTEGER NOT NULL REFERENCES Account(aid),
  seq INTEGER NOT NULL,
- type CHAR(4) NOT NULL,
+ type CHAR(4) NOT NULL check(type = 'buy' or type = 'sell'),
  timestamp TIMESTAMP NOT NULL,
  sym CHAR(5) NOT NULL REFERENCES Stock(sym),
  shares DECIMAL(10,2) NOT NULL,
@@ -49,6 +49,12 @@ CREATE TABLE Trade
 CREATE FUNCTION TF_TradeSeqAppendOnly() RETURNS TRIGGER AS $$
 BEGIN
   -- YOUR IMPLEMENTATION GOES HERE >>>
+  -- The append-only condition of c) is already satisfied.
+  -- How to check of an older seq is > a newer seq?
+  IF exists(select distinct t1.seq, t2.seq from Trade as t1, Trade as t2 where 
+  (t1.seq < t2.seq) and (t1.timestamp > t2.timestamp)) THEN
+    RAISE EXCEPTION 'trade table is sequential';
+  END IF;
   -- Do not modify the CREATE TRIGGER statement that follows.
   IF TG_OP IN ('DELETE', 'UPDATE') THEN
     RAISE EXCEPTION 'trade table is append-only';
@@ -70,6 +76,11 @@ CREATE TRIGGER TG_TradeSeqAppendOnly
 CREATE FUNCTION TF_BrokerNotAccountOwner() RETURNS TRIGGER AS $$
 BEGIN
   -- YOUR IMPLEMENTATION GOES HERE >>>
+  -- hmm. Brokers cannot own accounts -> owns.pid cannot be in broker.pid
+  IF exists(select pid from broker as b left join owns as o
+  on b.pid = o.pid):
+    RAISE EXCEPTION 'brokers cannot own accounts'
+  END IF;
   -- Do not modify the CREATE TRIGGER statements that follow.
   RETURN NEW;
   -- <<< YOUR IMPLEMENTATION ENDS HERE
@@ -98,8 +109,12 @@ CREATE VIEW Holds(aid, sym, shares) AS
   -- YOUR IMPLEMENTATION GOES HERE >>>
   -- Do not modify the CREATE FUNCTION and TRIGGER statements that follow.
   -- Stub implementation (incorrect):
-  SELECT DISTINCT aid, sym, 10000.00
-  FROM Account, Stock;
+  -- Get aid from trade, join stock with trade by sym ,and SUM(stock.price)
+  With bought(aid, sym) AS (
+    Select aid, sym from trade where type = 'buy' group by aid sym
+  );
+  Select bought.aid, bought.sym, sum(stock.price) from bought
+  left join stock on bought.sym = stock.sym;
   -- <<< YOUR IMPLEMENTATION ENDS HERE
 
 CREATE FUNCTION TF_NoOverSell() RETURNS TRIGGER AS $$
