@@ -30,7 +30,7 @@ CREATE TABLE Stock
 CREATE TABLE Trade
 (aid INTEGER NOT NULL REFERENCES Account(aid),
  seq INTEGER NOT NULL,
- type CHAR(4) NOT NULL check(type = 'buy' or type = 'sell'),
+ type CHAR(4) NOT NULL check(type = 'buy' or type = 'sell'), -- b)
  timestamp TIMESTAMP NOT NULL,
  sym CHAR(5) NOT NULL REFERENCES Stock(sym),
  shares DECIMAL(10,2) NOT NULL,
@@ -51,8 +51,8 @@ BEGIN
   -- YOUR IMPLEMENTATION GOES HERE >>>
   -- The append-only condition of c) is already satisfied.
   -- How to check of an older seq is > a newer seq?
-  IF exists(select distinct t1.seq, t2.seq from Trade as t1, Trade as t2 where 
-  (t1.seq < t2.seq) and (t1.timestamp > t2.timestamp)) THEN
+  IF exists(select distinct t1.seq, t2.seq from trade as t1, Trade as t2 where 
+  (t1.seq < t2.seq) and (t1.timestamp > t2.timestamp) and t1.aid = t2.aid) THEN
     RAISE EXCEPTION 'trade table is sequential';
   END IF;
   -- Do not modify the CREATE TRIGGER statement that follows.
@@ -78,7 +78,7 @@ BEGIN
   -- YOUR IMPLEMENTATION GOES HERE >>>
   -- hmm. Brokers cannot own accounts -> owns.pid cannot be in broker.pid
   IF exists(select pid from broker as b left join owns as o
-  on b.pid = o.pid):
+  on b.pid = o.pid) THEN
     RAISE EXCEPTION 'brokers cannot own accounts'
   END IF;
   -- Do not modify the CREATE TRIGGER statements that follow.
