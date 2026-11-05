@@ -51,8 +51,8 @@ BEGIN
   -- YOUR IMPLEMENTATION GOES HERE >>>
   -- The append-only condition of c) is already satisfied.
   -- How to check of an older seq is > a newer seq?
-  IF exists(select distinct t1.seq, t2.seq from trade as t1, Trade as t2 where 
-  (t1.seq < t2.seq) and (t1.timestamp > t2.timestamp) and t1.aid = t2.aid) THEN
+  IF exists(select aid from trade where ((seq > NEW.seq) or (timestamp >= NEW.timestamp))
+    and aid = NEW.aid) THEN
     RAISE EXCEPTION 'trade table is sequential';
   END IF;
   -- Do not modify the CREATE TRIGGER statement that follows.
@@ -76,10 +76,9 @@ CREATE TRIGGER TG_TradeSeqAppendOnly
 CREATE FUNCTION TF_BrokerNotAccountOwner() RETURNS TRIGGER AS $$
 BEGIN
   -- YOUR IMPLEMENTATION GOES HERE >>>
-  -- hmm. Brokers cannot own accounts -> owns.pid cannot be in broker.pid
-  IF exists(select pid from broker as b left join owns as o
-  on b.pid = o.pid) THEN
-    RAISE EXCEPTION 'brokers cannot own accounts'
+  -- Brokers cannot own accounts -> owns.pid cannot = broker.pid
+  IF exists(select b.pid, o.pid from broker as b, owns as o where b.pid = o.pid) THEN
+    RAISE EXCEPTION 'brokers cannot own accounts';
   END IF;
   -- Do not modify the CREATE TRIGGER statements that follow.
   RETURN NEW;
@@ -110,12 +109,19 @@ CREATE VIEW Holds(aid, sym, shares) AS
   -- Do not modify the CREATE FUNCTION and TRIGGER statements that follow.
   -- Stub implementation (incorrect):
   -- Get aid from trade, join stock with trade by sym ,and SUM(stock.price)
-  With bought(aid, sym) AS (
-    Select aid, sym from trade where type = 'buy' group by aid sym
-  );
-  Select bought.aid, bought.sym, sum(stock.price) from bought
-  left join stock on bought.sym = stock.sym;
-  -- <<< YOUR IMPLEMENTATION ENDS HERE
+  with bought(aid, sym, shares) as (
+    select aid, sym, sum(shares) from trade where type = 'buy'
+    group by aid, sym
+  ),
+  sold(aid, sym, shares) as (
+    select aid, sym, sum(shares) from trade where type = 'sell'
+    group by aid, sym
+  )
+  select bought.aid, bought.sym, 
+  sum(COALESCE(bought.shares, 0) - COALESCE(sold.shares, 0)) 
+  from bought left join sold on sold.aid = bought.aid and bought.sym = sold.sym 
+  group by bought.aid, bought.sym;
+   -- <<< YOUR IMPLEMENTATION ENDS HERE
 
 CREATE FUNCTION TF_NoOverSell() RETURNS TRIGGER AS $$
 BEGIN

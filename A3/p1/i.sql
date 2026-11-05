@@ -1,3 +1,4 @@
 -- Write a DELETE statement that fails for violating (c).
+-- Correct
 DELETE FROM trade
-(select * from trade where sym <> "example")
+where sym IN (select sym from trade where sym <> 'nothing');
