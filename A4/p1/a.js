@@ -1,0 +1,1 @@
+printjson(db.people.find({name: /Martin$/}).toArray());
