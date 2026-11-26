@@ -16,7 +16,8 @@ app = Flask(__name__)
 # Inside the course Docker container use mongodb://mongodb:27017/parliament 
 # Otherwise outside the container use mongodb://localhost:27017/parliament 
 
-app.config["MONGO_URI"] = "mongodb://mongodb:27017/parliament"
+# app.config["MONGO_URI"] = "mongodb://mongodb:27017/parliament"
+app.config["MONGO_URI"] = "mongodb://localhost:27017/parliament"
 
 mongo = PyMongo(app)
 
@@ -34,6 +35,13 @@ def example():
     res = mongo.db.people.find({"name": {'$regex':' Martin$'} })
     return jsonify(res)
 
+# Example method: one person by id, e.g. /person/ca:person:commons:96081
+@app.route("/person/<lid>")
+def person(lid):
+    doc = mongo.db.people.find_one({"_id": lid}, {"_id": 1, "name": 1, "chamber": 1})
+    if doc is None:
+        abort(404)
+    return jsonify(doc)
 
 # a. Current MPs of a province: [{"name", "riding", "party"}], sorted by riding.
 @app.route("/getByProvince/<province_code>")
@@ -49,8 +57,15 @@ def getByProvince(province_code):
     if province is None:
         abort(404)
     
-    pipeline = [
-    ]
+    pipeline = [{"$match": {"roles.province": province}},
+                {"$match": {"roles.temporal_status": "current"}},
+                {"$match": {"roles.type": "mp"}},
+                {"$project": {"_id": 0, 
+                              "name": 1, 
+                              "riding": {"$last": "$roles.constituency.name"},
+                              "party": {"$last": "$affiliations.name"}}},
+                {"$sort": {"riding": 1}}
+               ]
     # do not change the aggregate query below
     res = mongo.db.people.aggregate(pipeline)
     return jsonify(res)
@@ -76,7 +91,7 @@ def update(lid, as_of):
  	or remember to reload the db contents if you need to test the queries
     """
     # REPLACE THE NEXT LINE to find the given legislator
-    person = None
+    person = mongo.db.people.aggregate({"$match": {"_id": lid}}, {"$project": {"_id": 0, "name": 1}})
     if person is None:
         abort(404, description=f"Legislator {lid} not found")
 
